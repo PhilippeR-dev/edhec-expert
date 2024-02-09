@@ -6,6 +6,13 @@ select count(1) from PLACES_DENORM;
 select count(1) from PLACES_POSTCODES;
 -- 11 710 231
 
+select * from PLACES_POSTCODES;
+
+select * from POSTCODES;
+
+select count(1) from POSTCODES;
+-- 8 662 268
+
 with sel as (
     SELECT PL.*
     FROM "REF_DEV"."REF_GEOGRAPHIQUE"."PLACES" PL
@@ -27,3 +34,6 @@ group by ISO
 order by 2 desc;
 -- 1 - AR > 2 183 860
 -- 24 - FR > 49 078
+
+
+SELECT count(1) FROM REF_DEV.PUBLIC.PLACES_POSTCODES_SEARCH;
