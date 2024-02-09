@@ -17,3 +17,21 @@ select
 ;
 
 SELECT REGEXP_REPLACE('Votre chaîne avec   plusieurs   espaces', '\\s+', ' ', 1, 0) AS chaine_modifiee;
+
+
+CREATE OR REPLACE FUNCTION REF_DEV.PUBLIC.REMOVE_SPECIAL_CHARS_PLUS(ptest text)
+ RETURNS TEXT
+ LANGUAGE SQL
+ AS 
+ $$
+  SELECT UPPER(TRANSLATE(REF_DEV.PUBLIC.REMOVE_SPECIAL_CHARS(ptest),' -',''))
+ $$;
+
+  select 
+  --'Crème brulée' as texte
+  --'Québec' as texte
+  --'Cancún' as texte
+  --'San Fransico' as texte
+  'Saint-Maur-des-Fossés' as texte
+  ,REF_DEV.PUBLIC.REMOVE_SPECIAL_CHARS_PLUS(texte) as texte_search
+;
