@@ -64,3 +64,12 @@ from REF_DEV.PUBLIC.COUNTRY_PLACE_POSTCODES_SEARCH tb
 group by tb.COUNTRY_CODE, tb.PLACE_ID, tb.LOCALITY 
 order by 4 desc
 ; 
+-- IL	11953143	Jerusalem	61 388 (max)
+
+
+select tb.COUNTRY_CODE,count(1)
+from REF_DEV.PUBLIC.COUNTRY_PLACES_SEARCH tb
+group by tb.COUNTRY_CODE
+order by 2 desc
+;
+-- CN 754 236 (max)
