@@ -73,3 +73,8 @@ group by tb.COUNTRY_CODE
 order by 2 desc
 ;
 -- CN 754 236 (max)
+
+
+select count(distinct tb.COUNTRY_CODE) as CC_cpt
+from REF_DEV.PUBLIC.COUNTRY_PLACES_SEARCH tb
+;
