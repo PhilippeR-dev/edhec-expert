@@ -34,7 +34,7 @@ conda install conda-forge::streamlit
 (base) c:\Repos\edhec-expert>C:\apps\Anaconda\python.exe -m pip install streamlit-extras
 ```
 
-Exécution du programme
+###### Exécution du programme
 
 ```
 (base) C:\Repos\edhec-expert>streamlit run c:\Repos\edhec-expert\ref-geographique\streamlit-app\ref_geographique_analysis.py
