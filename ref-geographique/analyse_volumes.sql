@@ -64,7 +64,7 @@ from REF_DEV.PUBLIC.COUNTRY_PLACE_POSTCODES_SEARCH tb
 group by tb.COUNTRY_CODE, tb.PLACE_ID, tb.LOCALITY 
 order by 4 desc
 ; 
--- IL	11953143	Jerusalem	61 388 (max)
+-- IL	11 953 143	Jerusalem	61 388 (max)
 
 
 select tb.COUNTRY_CODE,count(1)
