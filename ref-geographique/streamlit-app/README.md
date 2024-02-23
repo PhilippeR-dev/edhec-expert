@@ -22,17 +22,21 @@ Prérepris :
 
 Installation :
 
+* snowpark
+
+  ```
+  conda install snowflake-snowpark-python pandas pyarrow
+  ```
 * streamlit
 
-```
-conda install conda-forge::streamlit
-```
-
+  ```
+  conda install conda-forge::streamlit
+  ```
 * streamlit-extras
 
-```
-(base) c:\Repos\edhec-expert>C:\apps\Anaconda\python.exe -m pip install streamlit-extras
-```
+  ```
+  (base) c:\Repos\edhec-expert>C:\apps\Anaconda\python.exe -m pip install streamlit-extras
+  ```
 
 ###### Exécution du programme
 
