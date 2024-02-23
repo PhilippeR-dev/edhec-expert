@@ -9,6 +9,8 @@ import os
 import json
 import pandas as pd
 import configparser
+import unicodedata
+import re
 
 
 # Function to create Snowflake Session to connect to Snowflake
@@ -62,11 +64,20 @@ def load_ref_list(session_df_name,list_name,column_name):
         entity_list = pd_df_entity.loc[:,column_name].to_list()
         st.session_state[list_name] = entity_list
        
-
+def remove_special_chars(N):
+    # Normaliser la chaîne en utilisant la forme décomposée Unicode (NFD)
+    normalized = unicodedata.normalize('NFD', N)
+    # Remplacer tous les caractères diacritiques par une chaîne vide
+    removed = re.sub(r'[\u0300-\u036f]', '', normalized)
+    # Remplacer les tirets et les espaces par une chaîne vide
+    replaced = removed.replace('-', '').replace(' ', '')
+    return replaced
         
-def get_dataset_places_postcodes(session_snow,p_country_code,p_city_name="n/a",p_postcode="n/a"):
+def get_dataset_places_postcodes(session_snow,p_country_code,p_city_name="n/a",p_postcode="n/a",p_df_country=None):
 
-    if p_city_name == "n/a" and p_postcode == "n/a":
+    v_city_name_modified=remove_special_chars(p_city_name).upper()
+    v_postcode_modified=remove_special_chars(p_postcode).upper()
+    if (p_city_name == "n/a" or v_city_name_modified == '') and (p_postcode == "n/a" or v_postcode_modified != ''):
         df=session_snow.sql("SELECT  COUNTRY_CODE, COUNTRY_NAME, \
                                      PLACE_ID, LOCALITY, NEUTRAL_LOCALITY, \
                                      POSTCODE_ID, POSTCODE, NEUTRAL_POSTCODE, \
@@ -74,34 +85,12 @@ def get_dataset_places_postcodes(session_snow,p_country_code,p_city_name="n/a",p
                              FROM REF_DEV.PUBLIC.COUNTRY_PLACES_POSTCODES_SEARCH \
                              WHERE COUNTRY_CODE = ? \
                             ", params=[p_country_code] )
-    elif p_city_name != "n/a" and p_postcode == "n/a":    
-        df=session_snow.sql("SELECT  COUNTRY_CODE, COUNTRY_NAME, \
-                                     PLACE_ID, LOCALITY, NEUTRAL_LOCALITY, \
-                                     POSTCODE_ID, POSTCODE, NEUTRAL_POSTCODE, \
-                                     REGION_ID, REGION_NAME \
-                             FROM REF_DEV.PUBLIC.COUNTRY_PLACES_POSTCODES_SEARCH \
-                             WHERE COUNTRY_CODE = ? \
-                               AND NEUTRAL_LOCALITY LIKE REF_DEV.PUBLIC.REMOVE_SPECIAL_CHARS_PLUS( ? )||'%' \
-                            ", params=[p_country_code,p_city_name] )
-    elif p_city_name == "n/a" and p_postcode != "n/a":    
-        df=session_snow.sql("SELECT  COUNTRY_CODE, COUNTRY_NAME, \
-                                     PLACE_ID, LOCALITY, NEUTRAL_LOCALITY, \
-                                     POSTCODE_ID, POSTCODE, NEUTRAL_POSTCODE, \
-                                     REGION_ID, REGION_NAME \
-                             FROM REF_DEV.PUBLIC.COUNTRY_PLACES_POSTCODES_SEARCH \
-                             WHERE COUNTRY_CODE = ? \
-                               AND NEUTRAL_POSTCODE LIKE REF_DEV.PUBLIC.REMOVE_SPECIAL_CHARS_PLUS( ? )||'%' \
-                            ", params=[p_country_code,p_postcode] )
-    elif p_city_name != "n/a" and p_postcode != "n/a":    
-        df=session_snow.sql("SELECT  COUNTRY_CODE, COUNTRY_NAME, \
-                                     PLACE_ID, LOCALITY, NEUTRAL_LOCALITY, \
-                                     POSTCODE_ID, POSTCODE, NEUTRAL_POSTCODE, \
-                                     REGION_ID, REGION_NAME \
-                             FROM REF_DEV.PUBLIC.COUNTRY_PLACES_POSTCODES_SEARCH \
-                             WHERE COUNTRY_CODE = ? \
-                               AND NEUTRAL_LOCALITY LIKE REF_DEV.PUBLIC.REMOVE_SPECIAL_CHARS_PLUS( ? )||'%' \
-                               AND NEUTRAL_POSTCODE LIKE REF_DEV.PUBLIC.REMOVE_SPECIAL_CHARS_PLUS( ? )||'%' \
-                            ", params=[p_country_code,p_city_name,p_postcode] )         
+    elif (p_city_name != "n/a" and v_city_name_modified != '') and p_postcode == "n/a": 
+        df=p_df_country.filter(col("NEUTRAL_LOCALITY").startswith(v_city_name_modified))
+    elif p_city_name == "n/a" and (p_postcode != "n/a" and v_postcode_modified != '') :
+        df=p_df_country.filter(col("NEUTRAL_POSTCODE").startswith(v_postcode_modified))    
+    elif (p_city_name != "n/a" and v_city_name_modified != '') and (p_postcode != "n/a" and v_postcode_modified != ''):
+        df=p_df_country.filter((col("NEUTRAL_LOCALITY").startswith(v_city_name_modified)) & (col("NEUTRAL_POSTCODE").startswith(v_postcode_modified)))          
 
     return df              
     
@@ -142,6 +131,7 @@ def main():
                                                           .filter(sql_expr("NEUTRAL_LOCALITY LIKE 'PARIS%'")) \
                                                           .sort(col("NEUTRAL_LOCALITY").asc(),col("NEUTRAL_POSTCODE").asc()) \
                                                           .limit(50)
+        st.session_state['df_PLACES_POSTCODES_COUNTRY']=df_PLACES_POSTCODES_FR 
         st.session_state['df_PLACES_POSTCODES_FR']=df_PLACES_POSTCODES_FR
         st.session_state['df_PLACES_POSTCODES_DISPLAY']=df_PLACES_POSTCODES_DISPLAY
     
@@ -158,20 +148,36 @@ def main():
      
         
     if b_country_input:
-        df_pd_country_code=st.session_state['df_COUNTRIES'].select(col("COUNTRY_CODE")).filter(col("SEARCH_COUNTRY") == st.session_state['selbox_country']).to_pandas()
+        df_pd_country_code=st.session_state['df_COUNTRIES'] \
+                                .select(col("COUNTRY_CODE")) \
+                                .filter(col("SEARCH_COUNTRY") == st.session_state['selbox_country']) \
+                                .to_pandas()
         country_code=df_pd_country_code.iloc[0, 0]
         if country_code == 'FR':
             df_PLACES_POSTCODES=st.session_state['df_PLACES_POSTCODES_FR']
+            st.session_state['df_PLACES_POSTCODES_COUNTRY']=df_PLACES_POSTCODES
         else:
+            st.session_state['df_PLACES_POSTCODES_COUNTRY']=get_dataset_places_postcodes(session,country_code)
             if 'city_key' not in st.session_state and 'postcode_key' not in st.session_state:
-                df_PLACES_POSTCODES=get_dataset_places_postcodes(session,country_code)
+                df_PLACES_POSTCODES=st.session_state['df_PLACES_POSTCODES_COUNTRY']
             elif 'city_key' in st.session_state and 'postcode_key' not in st.session_state:
-                df_PLACES_POSTCODES=get_dataset_places_postcodes(session,country_code,p_city_name=st.session_state['city_key'])
+                df_PLACES_POSTCODES=get_dataset_places_postcodes(   session,
+                                                                    country_code,
+                                                                    p_city_name=st.session_state['city_key'],
+                                                                    p_df_country=st.session_state['df_PLACES_POSTCODES_COUNTRY']    )
             elif 'city_key' not in st.session_state and 'postcode_key' in st.session_state:
-                df_PLACES_POSTCODES=get_dataset_places_postcodes(session,country_code,p_postcode=st.session_state['postcode_key'])
+                df_PLACES_POSTCODES=get_dataset_places_postcodes(   session,
+                                                                    country_code,
+                                                                    p_postcode=st.session_state['postcode_key'],
+                                                                    p_df_country=st.session_state['df_PLACES_POSTCODES_COUNTRY']    )
             elif 'city_key' in st.session_state and 'postcode_key' in st.session_state:
-                df_PLACES_POSTCODES=get_dataset_places_postcodes(session,country_code,st.session_state['city_key'],st.session_state['postcode_key'])
+                df_PLACES_POSTCODES=get_dataset_places_postcodes(   session,
+                                                                    country_code,
+                                                                    p_city_name=st.session_state['city_key'],
+                                                                    p_postcode=st.session_state['postcode_key'],
+                                                                    p_df_country=st.session_state['df_PLACES_POSTCODES_COUNTRY']    )
                     
+        
         st.session_state['df_PLACES_POSTCODES_DISPLAY']=df_PLACES_POSTCODES.with_column("SELBOX", lit(False)) \
                                                                            .sort(col("NEUTRAL_LOCALITY").asc(),col("NEUTRAL_POSTCODE").asc()) \
                                                                            .limit(50)
@@ -215,15 +221,28 @@ def main():
         ##
                 
         if vcity_name_search != '' and vpostcode_search != '': 
-            df_PLACES_POSTCODES=get_dataset_places_postcodes(session,st.session_state['country_code'],vcity_name_search,vpostcode_search)    
+            df_PLACES_POSTCODES=get_dataset_places_postcodes(   session,
+                                                                st.session_state['country_code'],
+                                                                p_city_name=vcity_name_search,
+                                                                p_postcode=vpostcode_search,
+                                                                p_df_country=st.session_state['df_PLACES_POSTCODES_COUNTRY']    )    
         elif vcity_name_search != '' and vpostcode_search == '':
-            df_PLACES_POSTCODES=get_dataset_places_postcodes(session,st.session_state['country_code'],vcity_name_search)     
+            df_PLACES_POSTCODES=get_dataset_places_postcodes(   session,
+                                                                st.session_state['country_code'],
+                                                                p_city_name=vcity_name_search,
+                                                                p_df_country=st.session_state['df_PLACES_POSTCODES_COUNTRY']    )     
         elif vcity_name_search == '' and vpostcode_search != '':
-            df_PLACES_POSTCODES=get_dataset_places_postcodes(session,st.session_state['country_code'],vpostcode_search)     
+            df_PLACES_POSTCODES=get_dataset_places_postcodes(   session,
+                                                                st.session_state['country_code'],
+                                                                p_postcode=vpostcode_search,
+                                                                p_df_country=st.session_state['df_PLACES_POSTCODES_COUNTRY']    )
+        else:
+            df_PLACES_POSTCODES=get_dataset_places_postcodes(   session,
+                                                                st.session_state['country_code']   )                 
  
         st.session_state['df_PLACES_POSTCODES_DISPLAY']=df_PLACES_POSTCODES.with_column("SELBOX", lit(False)) \
-                                                                        .sort(col("NEUTRAL_LOCALITY").asc(),col("NEUTRAL_POSTCODE").asc()) \
-                                                                        .limit(50)   
+                                                                           .sort(col("NEUTRAL_LOCALITY").asc(),col("NEUTRAL_POSTCODE").asc()) \
+                                                                           .limit(50)   
         st.session_state['city_name_key']=vcity_name_search
         st.session_state['postcode_code_key']=vpostcode_search
 
